@@ -1,6 +1,8 @@
+# Based on https://github.com/selimsef/dsb2018_topcoders/blob/master/albu/src/pytorch_utils/callbacks.py
 import logging
 import os
 from copy import deepcopy
+from queue import PriorityQueue
 
 import torch
 from tensorboardX import SummaryWriter
@@ -91,6 +93,17 @@ class Callbacks(Callback):
             callback.on_train_end()
 
 
+class ModelRestorer(Callback):
+    def __init__(self, checkpoint_path):
+        super().__init__()
+        self.checkpoint_path = checkpoint_path
+
+    def on_train_begin(self):
+        state = torch.load(self.checkpoint_path, map_location=self.runner.device)
+        self.runner.model.module.load_state_dict(state['state_dict'])
+        self.runner.optimizer.load_state_dict(state['optimizer'])
+
+
 class ModelSaver(Callback):
     def __init__(
             self, save_dir, save_every, save_name,
@@ -128,6 +141,52 @@ class ModelSaver(Callback):
                     self.save_checkpoint(epoch=epoch, path=path)
                 else:
                     torch.save(obj=deepcopy(self.runner.model.module), f=path)
+
+
+class CheckpointSaver(Callback):
+    def __init__(self, save_dir, save_name, num_checkpoints, mode, metric_name):
+        super().__init__()
+        self.mode = mode
+        self.save_name = save_name
+        self._best_checkpoints_queue = PriorityQueue(num_checkpoints)
+        self._metric_name = metric_name
+        self.save_dir = save_dir
+
+    def on_stage_begin(self):
+        os.makedirs(self.save_dir, exist_ok=True)
+        while not self._best_checkpoints_queue.empty():
+            self._best_checkpoints_queue.get()
+
+    def save_checkpoint(self, epoch, path):
+        torch.save({
+            'epoch': epoch + 1,
+            'state_dict': self.runner.model.module.state_dict(),
+            'optimizer': self.runner.optimizer.state_dict()}, path)
+
+    def on_epoch_end(self, epoch):
+        metric = self.metrics.val_metrics[self._metric_name]
+        new_path_to_save = os.path.join(
+            self.save_dir,
+            self.save_name.format(epoch=epoch, metric="{:.5}".format(metric)))
+        if self._try_update_best_losses(metric, new_path_to_save):
+            self.save_checkpoint(epoch=epoch, path=new_path_to_save)
+
+    def _try_update_best_losses(self, metric, new_path_to_save):
+        if self.mode == 'min':
+            metric = -metric
+        if not self._best_checkpoints_queue.full():
+            self._best_checkpoints_queue.put((metric, new_path_to_save))
+            return True
+
+        min_metric, min_metric_path = self._best_checkpoints_queue.get()
+
+        if min_metric < metric:
+            os.remove(min_metric_path)
+            self._best_checkpoints_queue.put((metric, new_path_to_save))
+            return True
+
+        self._best_checkpoints_queue.put((min_metric, min_metric_path))
+        return False
 
 
 class TensorBoard(Callback):
