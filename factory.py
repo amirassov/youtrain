@@ -13,7 +13,7 @@ class Factory:
         if 'weights' not in self.params or self.params['weights'] is None:
             return model
         elif isinstance(self.params['weights'], str):
-            model.load_state_dict(torch.load(self.params['weights']))
+            model.load_state_dict(torch.load(self.params['weights'])['state_dict'])
             return model
         else:
             raise ValueError("type of weights should be None or str")
