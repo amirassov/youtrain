@@ -82,23 +82,20 @@ class Runner:
                 enumerate(loader), total=len(loader),
                 desc=f"Epoch {epoch} validating...", ncols=0)
 
+        metrics = {}
         with torch.set_grad_enabled(is_train):
             for i, data in progress_bar:
                 self.callbacks.on_batch_begin(i)
                 step_report = self._make_step(data, is_train)
-                self.callbacks.on_batch_end(i, step_report=step_report, is_train=is_train)
-
                 for key, value in step_report.items():
                     if isinstance(value, torch.Tensor):
                         value = value.item()
                     epoch_report[key] += value
 
-                progress_bar.set_postfix(
-                    **{k: "{:.5f}".format(v / (i + 1)) for k, v in epoch_report.items()})
-
-                if is_train and i >= self.factory.params['steps_per_epoch']:
-                    break
-        return {key: value / len(loader) for key, value in epoch_report.items()}
+                metrics = {k: v / (i + 1) for k, v in epoch_report.items()}
+                progress_bar.set_postfix(**{k: f"{v:.5f}" for k, v in metrics.items()})
+                self.callbacks.on_batch_end(i, step_report=step_report, is_train=is_train)
+        return metrics
 
     def _make_step(self, data, is_train):
         report = {}
