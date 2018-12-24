@@ -1,6 +1,6 @@
 from collections import defaultdict
 from tqdm import tqdm
-
+from typing import Dict
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -18,7 +18,7 @@ class Metrics:
 
 
 class Runner:
-    def __init__(self, factory, callbacks, stages, device):
+    def __init__(self, factory, callbacks, stages: Dict[str, dict], device):
         self.stages = stages
         self.factory = factory
         self.device = device
@@ -28,6 +28,7 @@ class Runner:
         self.metrics = Metrics(self.factory.make_metrics())
 
         self.current_stage = None
+        self.current_stage_name = None
         self.global_epoch = 0
         self.optimizer = None
         self.scheduler = None
@@ -37,8 +38,9 @@ class Runner:
 
     def fit(self, data_factory):
         self.callbacks.on_train_begin()
-        for stage in self.stages:
+        for stage_name, stage in self.stages.items():
             self.current_stage = stage
+            self.current_stage_name = stage_name
 
             train_loader = data_factory.make_loader(stage, is_train=True)
             val_loader = data_factory.make_loader(stage, is_train=False)
@@ -49,10 +51,10 @@ class Runner:
             self.callbacks.on_stage_begin()
             self._run_one_stage(train_loader, val_loader)
             self.callbacks.on_stage_end()
-
+            torch.cuda.empty_cache()
         self.callbacks.on_train_end()
 
-    def _run_one_stage(self, train_loader, val_loader=None):
+    def _run_one_stage(self, train_loader, val_loader):
         for epoch in range(self.current_stage['epochs']):
             self.callbacks.on_epoch_begin(self.global_epoch)
 
@@ -66,22 +68,16 @@ class Runner:
                 self.scheduler.step(self.metrics.val_metrics['loss'], epoch)
             else:
                 self.scheduler.step(epoch)
-
             self.callbacks.on_epoch_end(self.global_epoch)
             self.global_epoch += 1
 
-    def _run_one_epoch(self, epoch, loader, is_train=True):
+    def _run_one_epoch(self, epoch: int, loader, is_train: bool = True) -> Dict[str, float]:
         epoch_report = defaultdict(float)
-
-        if is_train:
-            progress_bar = tqdm(
-                enumerate(loader), total=self.factory.params['steps_per_epoch'],
-                desc=f"Epoch {epoch} training...", ncols=0)
-        else:
-            progress_bar = tqdm(
-                enumerate(loader), total=len(loader),
-                desc=f"Epoch {epoch} validating...", ncols=0)
-
+        progress_bar = tqdm(
+            iterable=enumerate(loader),
+            total=len(loader),
+            desc=f"Epoch {epoch} {['validation', 'train'][is_train]}ing...",
+            ncols=0)
         metrics = {}
         with torch.set_grad_enabled(is_train):
             for i, data in progress_bar:
@@ -97,7 +93,7 @@ class Runner:
                 self.callbacks.on_batch_end(i, step_report=step_report, is_train=is_train)
         return metrics
 
-    def _make_step(self, data, is_train):
+    def _make_step(self, data: Dict[str, torch.Tensor], is_train: bool) -> Dict[str, float]:
         report = {}
         data = self.batch2device(data)
         images = data['image']
@@ -121,5 +117,5 @@ class Runner:
 
         return report
 
-    def batch2device(self, data):
+    def batch2device(self, data: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return {k: v.to(self.device) for k, v in data.items()}
