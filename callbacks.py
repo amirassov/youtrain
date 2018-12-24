@@ -93,17 +93,6 @@ class Callbacks(Callback):
             callback.on_train_end()
 
 
-class ModelRestorer(Callback):
-    def __init__(self, checkpoint_path):
-        super().__init__()
-        self.checkpoint_path = checkpoint_path
-
-    def on_train_begin(self):
-        state = torch.load(self.checkpoint_path, map_location=self.runner.device)
-        self.runner.model.module.load_state_dict(state['state_dict'])
-        self.runner.optimizer.load_state_dict(state['optimizer'])
-
-
 class ModelSaver(Callback):
     def __init__(
             self, save_dir, save_every, save_name,
@@ -152,8 +141,11 @@ class CheckpointSaver(Callback):
         self._metric_name = metric_name
         self.save_dir = save_dir
 
-    def on_stage_begin(self):
+    def on_train_begin(self):
         os.makedirs(self.save_dir, exist_ok=True)
+
+    def on_stage_begin(self):
+        os.makedirs(self.save_dir / self.runner.current_stage_name, exist_ok=True)
         while not self._best_checkpoints_queue.empty():
             self._best_checkpoints_queue.get()
 
@@ -166,7 +158,7 @@ class CheckpointSaver(Callback):
     def on_epoch_end(self, epoch):
         metric = self.metrics.val_metrics[self._metric_name]
         new_path_to_save = os.path.join(
-            self.save_dir,
+            self.save_dir / self.runner.current_stage_name,
             self.save_name.format(epoch=epoch, metric="{:.5}".format(metric)))
         if self._try_update_best_losses(metric, new_path_to_save):
             self.save_checkpoint(epoch=epoch, path=new_path_to_save)
@@ -242,6 +234,7 @@ class Logger(Callback):
 
     @staticmethod
     def _get_logger(log_path):
+        print(log_path)
         logger = logging.getLogger(log_path)
         logger.setLevel(logging.DEBUG)
         fh = logging.FileHandler(log_path)
