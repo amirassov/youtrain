@@ -54,7 +54,7 @@ class DataFactory:
     def make_train_loader(self):
         raise NotImplementedError
 
-    def make_val_loader(self, **kwargs):
+    def make_val_loader(self):
         raise NotImplementedError
 
 
