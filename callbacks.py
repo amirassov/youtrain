@@ -234,7 +234,6 @@ class Logger(Callback):
 
     @staticmethod
     def _get_logger(log_path):
-        print(log_path)
         logger = logging.getLogger(log_path)
         logger.setLevel(logging.DEBUG)
         fh = logging.FileHandler(log_path)
