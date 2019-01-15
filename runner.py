@@ -42,8 +42,8 @@ class Runner:
             self.current_stage = stage
             self.current_stage_name = stage_name
 
-            train_loader = data_factory.make_loader(stage, is_train=True)
-            val_loader = data_factory.make_loader(stage, is_train=False)
+            train_loader = data_factory.make_train_loader()
+            val_loader = data_factory.make_val_loader()
 
             self.optimizer = self.factory.make_optimizer(self.model, stage)
             self.scheduler = self.factory.make_scheduler(self.optimizer, stage)
