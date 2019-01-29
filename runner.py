@@ -3,7 +3,7 @@ from tqdm import tqdm
 from typing import Dict
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from src.retinanet.models.parallel import DataParallelCriterion, DataParallelModel
+from .parallel import DataParallelCriterion, DataParallelModel
 
 tqdm.monitor_interval = 0
 
