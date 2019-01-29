@@ -2,8 +2,8 @@ from collections import defaultdict
 from tqdm import tqdm
 from typing import Dict
 import torch
-import torch.nn as nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from .parallel import DataParallelCriterion, DataParallelModel
 
 tqdm.monitor_interval = 0
 
@@ -23,8 +23,8 @@ class Runner:
         self.factory = factory
         self.device = device
         self.model = self.factory.make_model()
-        self.model = nn.DataParallel(self.model).to(device)
-        self.loss = self.factory.make_loss().to(device)
+        self.model = DataParallelModel(self.model).to(device)
+        self.loss = DataParallelCriterion(self.factory.make_loss()).to(device)
         self.metrics = Metrics(self.factory.make_metrics())
 
         self.current_stage = None
@@ -97,7 +97,7 @@ class Runner:
         report = {}
         data = self.batch2device(data)
         images = data['image']
-        labels = data['mask']
+        labels = data['label']
 
         if is_train:
             self.optimizer.zero_grad()
