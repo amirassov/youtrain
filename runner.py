@@ -118,4 +118,4 @@ class Runner:
         return report
 
     def batch2device(self, data: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        return {k: v.to(self.device) for k, v in data.items()}
+        return {k: v.to(self.device) for k, v in data.items() if hasattr(v, "to")}

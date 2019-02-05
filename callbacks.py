@@ -1,4 +1,3 @@
-# Based on https://github.com/selimsef/dsb2018_topcoders/blob/master/albu/src/pytorch_utils/callbacks.py
 import logging
 import os
 from copy import deepcopy
@@ -182,7 +181,7 @@ class CheckpointSaver(Callback):
 
 
 class TensorBoard(Callback):
-    def __init__(self, log_dir):
+    def __init__(self, log_dir: str):
         super().__init__()
         self.log_dir = log_dir
         self.writer = None
