@@ -4,6 +4,7 @@ from typing import Dict
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from .parallel import DataParallelCriterion, DataParallelModel
+from torch.nn import DataParallel
 
 tqdm.monitor_interval = 0
 
@@ -18,13 +19,19 @@ class Metrics:
 
 
 class Runner:
-    def __init__(self, factory, callbacks, stages: Dict[str, dict], device):
+    def __init__(self, factory, callbacks, stages: Dict[str, dict], device, parallel='pytorch'):
         self.stages = stages
         self.factory = factory
         self.device = device
         self.model = self.factory.make_model()
-        self.model = DataParallelModel(self.model).to(device)
-        self.loss = DataParallelCriterion(self.factory.make_loss()).to(device)
+        self.loss = self.factory.make_loss()
+        if parallel == 'pytorch':
+            self.model = DataParallel(self.model)
+        elif parallel == 'criterion':
+            self.model = DataParallelModel(self.model)
+            self.loss = DataParallelCriterion(self.loss)
+        self.model = self.model.to(device)
+        self.loss = self.loss.to(device)
         self.metrics = Metrics(self.factory.make_metrics())
 
         self.current_stage = None
@@ -34,7 +41,7 @@ class Runner:
         self.scheduler = None
 
         self.callbacks = callbacks
-        self.callbacks.set_trainer(self)
+        self.callbacks.set_runner(self)
 
     def fit(self, data_factory):
         self.callbacks.on_train_begin()
@@ -44,7 +51,6 @@ class Runner:
 
             train_loader = data_factory.make_train_loader()
             val_loader = data_factory.make_val_loader()
-
             self.optimizer = self.factory.make_optimizer(self.model, stage)
             self.scheduler = self.factory.make_scheduler(self.optimizer, stage)
 
@@ -63,7 +69,6 @@ class Runner:
 
             self.model.eval()
             self.metrics.val_metrics = self._run_one_epoch(epoch, val_loader, is_train=False)
-
             if isinstance(self.scheduler, ReduceLROnPlateau):
                 self.scheduler.step(self.metrics.val_metrics['loss'], epoch)
             else:

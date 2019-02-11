@@ -16,7 +16,7 @@ class Callback(object):
         self.runner = None
         self.metrics = None
 
-    def set_trainer(self, runner):
+    def set_runner(self, runner):
         self.runner = runner
         self.metrics = runner.metrics
 
@@ -55,9 +55,10 @@ class Callbacks(Callback):
         else:
             self.callbacks = []
 
-    def set_trainer(self, runner):
+    def set_runner(self, runner):
+        super().set_runner(runner)
         for callback in self.callbacks:
-            callback.set_trainer(runner)
+            callback.set_runner(runner)
 
     def on_batch_begin(self, i, **kwargs):
         for callback in self.callbacks:
@@ -149,9 +150,13 @@ class CheckpointSaver(Callback):
             self._best_checkpoints_queue.get()
 
     def save_checkpoint(self, epoch, path):
+        if hasattr(self.runner.model, 'module'):
+            state_dict = self.runner.model.module.state_dict()
+        else:
+            state_dict = self.runner.model.state_dict()
         torch.save({
             'epoch': epoch + 1,
-            'state_dict': self.runner.model.module.state_dict(),
+            'state_dict': state_dict,
             'optimizer': self.runner.optimizer.state_dict()}, path)
 
     def on_epoch_end(self, epoch):
