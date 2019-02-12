@@ -3,6 +3,16 @@ import torch
 import os
 from glob import glob
 import numpy as np
+from .utils import model_parallel, criterion_parallel
+
+
+class Metrics:
+    def __init__(self, functions):
+        self.functions = functions
+        self.best_score = float('inf')
+        self.best_epoch = 0
+        self.train_metrics = {}
+        self.val_metrics = {}
 
 
 class Factory:
@@ -10,16 +20,14 @@ class Factory:
         self.params = params
         self.kwargs = kwargs
 
-    def make_model(self) -> torch.nn.Module:
+    def make_model(self, parallel_mode, device) -> torch.nn.Module:
         model_name = self.params['model']
         model = pydoc.locate(model_name)(**self.params['model_params'])
-        if 'weights' not in self.params or self.params['weights'] is None:
-            return model
-        elif isinstance(self.params['weights'], str):
+        if isinstance(self.params.get('weights', None), str):
             model.load_state_dict(torch.load(self.params['weights'])['state_dict'])
-            return model
         else:
             raise ValueError("type of weights should be None or str")
+        return model_parallel(model, parallel_mode).to(device)
 
     @staticmethod
     def make_optimizer(model, stage) -> torch.optim.Optimizer:
@@ -38,12 +46,12 @@ class Factory:
             optimizer=optimizer,
             **stage['scheduler_params'])
 
-    def make_loss(self) -> torch.nn.Module:
-        return pydoc.locate(self.params['loss'])(
-            **self.params['loss_params'])
+    def make_loss(self, parallel_mode, device) -> torch.nn.Module:
+        loss = pydoc.locate(self.params['loss'])(**self.params['loss_params'])
+        return criterion_parallel(loss, parallel_mode).to(device)
 
-    def make_metrics(self) -> dict:
-        return {metric: pydoc.locate(metric)(**params) for metric, params in self.params['metrics'].items()}
+    def make_metrics(self) -> Metrics:
+        return Metrics({metric: pydoc.locate(metric)(**params) for metric, params in self.params['metrics'].items()})
 
 
 class DataFactory:

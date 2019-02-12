@@ -3,36 +3,22 @@ from tqdm import tqdm
 from typing import Dict
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from .parallel import DataParallelCriterion, DataParallelModel
-from torch.nn import DataParallel
-
-tqdm.monitor_interval = 0
-
-
-class Metrics:
-    def __init__(self, functions):
-        self.functions = functions
-        self.best_score = float('inf')
-        self.best_epoch = 0
-        self.train_metrics = {}
-        self.val_metrics = {}
+from .utils import batch2device
 
 
 class Runner:
-    def __init__(self, factory, callbacks, stages: Dict[str, dict], device, parallel='pytorch'):
-        self.stages = stages
+    def __init__(self, factory, device, callbacks=None, stages: Dict[str, dict] = None, parallel_mode='pytorch'):
         self.factory = factory
         self.device = device
-        self.model = self.factory.make_model()
-        self.loss = self.factory.make_loss()
-        if parallel == 'pytorch':
-            self.model = DataParallel(self.model)
-        elif parallel == 'criterion':
-            self.model = DataParallelModel(self.model)
-            self.loss = DataParallelCriterion(self.loss)
-        self.model = self.model.to(device)
-        self.loss = self.loss.to(device)
-        self.metrics = Metrics(self.factory.make_metrics())
+        self.stages = stages
+        self.parallel_mode = parallel_mode
+        self.callbacks = callbacks
+        if callbacks is not None:
+            self.callbacks.set_runner(self)
+
+        self._model = None
+        self._loss = None
+        self._metrics = None
 
         self.current_stage = None
         self.current_stage_name = None
@@ -40,8 +26,23 @@ class Runner:
         self.optimizer = None
         self.scheduler = None
 
-        self.callbacks = callbacks
-        self.callbacks.set_runner(self)
+    @property
+    def model(self):
+        if self._model is None:
+            self._model = self.factory.make_model(parallel_mode=self.parallel_mode, device=self.device)
+        return self._model
+
+    @property
+    def loss(self):
+        if self._loss is None:
+            self._loss = self.factory.make_loss(parallel_mode=self.parallel_mode, device=self.device)
+        return self._loss
+
+    @property
+    def metrics(self):
+        if self._metrics is None:
+            self._metrics = self.factory.make_metrics()
+        return self._metrics
 
     def fit(self, data_factory):
         self.callbacks.on_train_begin()
@@ -123,4 +124,4 @@ class Runner:
         return report
 
     def batch2device(self, data: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        return {k: v.to(self.device) for k, v in data.items() if hasattr(v, "to")}
+        return batch2device(data, device=self.device)
