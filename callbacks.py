@@ -1,6 +1,5 @@
 import logging
 import os
-from copy import deepcopy
 from queue import PriorityQueue
 
 import torch

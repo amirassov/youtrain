@@ -1,8 +1,7 @@
 import pydoc
+
 import torch
-import os
-from glob import glob
-import numpy as np
+
 from .utils import model_parallel, criterion_parallel
 
 
@@ -64,38 +63,3 @@ class DataFactory:
 
     def make_val_loader(self):
         raise NotImplementedError
-
-
-class CheckpointLoader:
-    def __init__(self, params: dict, paths: dict):
-        self.paths = paths
-        self.params = params
-
-    def get_best_checkpoint(self):
-        all_checkpoints = self.all_checkpoints
-        if len(all_checkpoints) == 0:
-            raise RuntimeError('No checkpoints found')
-
-        best_checkpoint = self._chosen_best_checkpoint(all_checkpoints)
-        print('Best_checkpoint: ', best_checkpoint)
-        return best_checkpoint
-
-    @property
-    def all_checkpoints(self):
-        print(os.path.join(self.weights_dir, '**', '*.pt'))
-        checkpoints = glob(os.path.join(self.weights_dir, '**', '*.pt'), recursive=True)
-        return checkpoints
-
-    @staticmethod
-    def _get_checkpoint_metric(checkpoint):
-        return float(checkpoint.split('_')[-1].split('.pt')[0])
-
-    @property
-    def weights_dir(self):
-        return os.path.join(self.paths['path'], self.paths['weights'], self.params['name'])
-
-    def _chosen_best_checkpoint(self, checkpoints):
-        checkpoints = np.array(checkpoints)
-        metrics = [self._get_checkpoint_metric(ch) for ch in checkpoints]
-        best_checkpoint = checkpoints[np.argmax(metrics)]
-        return best_checkpoint
