@@ -19,25 +19,22 @@ class Factory:
         self.params = params
         self.kwargs = kwargs
 
-    def make_model(self, parallel_mode, device) -> torch.nn.Module:
+    def make_model(self, parallel_mode: str, device) -> torch.nn.Module:
         model_name = self.params['model']
         model = pydoc.locate(model_name)(**self.params['model_params'])
         if isinstance(self.params.get('weights', None), str):
             model.load_state_dict(torch.load(self.params['weights'])['state_dict'])
-        else:
-            raise ValueError("type of weights should be None or str")
         return model_parallel(model, parallel_mode).to(device)
 
     @staticmethod
-    def make_optimizer(model, stage) -> torch.optim.Optimizer:
+    def make_optimizer(model: torch.nn.Module, stage: dict) -> torch.optim.Optimizer:
         for p in model.parameters():
             p.requires_grad = True
         if 'freeze_features' in stage and stage['freeze_features']:
             for p in model.module.features.parameters():
                 p.requires_grad = False
         return getattr(torch.optim, stage['optimizer'])(
-            params=filter(lambda p: p.requires_grad, model.parameters()),
-            **stage['optimizer_params'])
+            params=filter(lambda x: x.requires_grad, model.parameters()), **stage['optimizer_params'])
 
     @staticmethod
     def make_scheduler(optimizer, stage):

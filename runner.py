@@ -12,9 +12,6 @@ class Runner:
         self.device = device
         self.stages = stages
         self.parallel_mode = parallel_mode
-        self.callbacks = callbacks
-        if callbacks is not None:
-            self.callbacks.set_runner(self)
 
         self._model = None
         self._loss = None
@@ -25,6 +22,10 @@ class Runner:
         self.global_epoch = 0
         self.optimizer = None
         self.scheduler = None
+
+        self.callbacks = callbacks
+        if callbacks is not None:
+            self.callbacks.set_runner(self)
 
     @property
     def model(self):
