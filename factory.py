@@ -46,8 +46,13 @@ class Factory:
         loss = pydoc.locate(self.params['loss'])(**self.params['loss_params'])
         return criterion_parallel(loss, parallel_mode).to(device)
 
+    @staticmethod
+    def get_metric_name(metric):
+        return metric.split('.')[-1]
+
     def make_metrics(self) -> Metrics:
-        return Metrics({metric: pydoc.locate(metric)(**params) for metric, params in self.params['metrics'].items()})
+        return Metrics({self.get_metric_name(metric): pydoc.locate(metric)(
+            **params) for metric, params in self.params['metrics'].items()})
 
 
 class DataFactory:
