@@ -3,7 +3,7 @@ from tqdm import tqdm
 from typing import Dict
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from .utils import batch2device
+from youtrain.utils import batch2device
 
 
 class Runner:
