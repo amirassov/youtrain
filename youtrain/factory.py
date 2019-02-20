@@ -2,7 +2,7 @@ import pydoc
 
 import torch
 
-from youtrain.utils import model_parallel, criterion_parallel
+from .utils import model_parallel, criterion_parallel
 
 
 class Metrics:

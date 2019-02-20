@@ -2,7 +2,7 @@ import random
 import torch
 import numpy as np
 import yaml
-from youtrain.parallel import DataParallelCriterion, DataParallelModel
+from .parallel import DataParallelCriterion, DataParallelModel
 from torch.nn import DataParallel
 
 
